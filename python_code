@@ -1,0 +1,59 @@
+import pandas as pd
+import pingouin
+import matplotlib.pyplot as plt
+
+#importing data from csv files
+men = pd.read_csv('men_results.csv', index_col=[0], parse_dates = ['date'])
+women = pd.read_csv('women_results.csv', index_col=[0], parse_dates = ['date'])
+
+#subset the data to include fifa matches after 2002
+men_subset = men[(men['date'] > '2002-01-01') & (men['tournament'].isin(['FIFA World Cup']))]
+women_subset = women[(women['date'] > '2002-01-01') & (women['tournament'].isin(['FIFA World Cup']))]
+
+#create group and total goal amount columns 
+men_subset['group'] = 'men'
+women_subset['group'] = 'women'
+men_subset['total_goals'] = men_subset['home_score'] + men_subset['away_score']
+women_subset['total_goals'] = women_subset['home_score'] + women_subset['away_score']
+
+#determine normality using histograms 
+plt.figure(figsize =(10,5))
+plt.subplot(1,2,1)
+men_subset['total_goals'].hist(bins = 25, color = 'blue')
+plt.title("Men's Goals")
+plt.xlabel('Total goals scored')
+plt.ylabel('Freqeuncy of Matches')
+
+plt.subplot(1,2,2)
+women_subset['total_goals'].hist(bins = 25, color = 'red')
+plt.title("Woman's Goals")
+plt.xlabel('Total goals scored')
+plt.ylabel('Freqeuncy of Matches')
+
+plt.show() 
+plt.clf()
+#Goals are not normally distributed, use WMU test of two groups instead
+
+#Combine men and woman into one dataframe
+men_and_women = pd.concat([men_subset, women_subset], axis = 0, ignore_index = True)
+men_and_women_wide = men_and_women.pivot(columns = 'group', values = 'total_goals')
+
+#perform right-tail MWU to extract p-value
+result_mwu = pingouin.mwu(x = men_and_women_wide['women'], y= men_and_women_wide['men'], alternative = 'greater')
+p_val = result_mwu['p-val'].values[0]
+print(p_val)
+
+#determine hypothesis test using significance value
+if p_val <= 0.1:
+    result = "reject"
+else: 
+    result = "fail to reject"
+
+result_dict = {"p_val": p_val, "result":result}
+
+#Calculate the mean for men and women matches to verify results
+total_goals_men = men_subset['total_goals'].mean()
+total_goals_women = women_subset['total_goals'].mean()
+
+print("mean of men goals: " + str(total_goals_men))
+print("mean of women goals: " + str(total_goals_women)) 
